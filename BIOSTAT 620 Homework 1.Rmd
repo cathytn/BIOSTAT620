@@ -1,0 +1,157 @@
+---
+title: "BIOSTAT 620 Homework 1"
+author: "Cathy Nguyen"
+date: "2/1/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# Packages
+library(readxl)
+library(circular)
+library(tidyverse)
+library(lubridate)
+library(GGally)
+# Import data
+data <- read_excel("ScreenTime_CNguyen.xlsx", col_types = c("date", "text", "numeric", "text", "numeric", "numeric", "date"))
+data <- data %>% mutate (Pickup.1st = as.POSIXct(paste(as.character(Date),
+unlist(lapply(Pickup.1st, function
+(x){strsplit(as.character(x), split = " ") [[1]][2]})))))
+# Only include data up to the data freeze date (Sunday, January 23, 2022)
+data$Date <- as.Date(data$Date) 
+data.freeze <- data %>% filter(between(Date, as.Date("2022-01-04"), as.Date("2022-01-23")))
+```
+
+# Part 1: Data Collection and Data Processing 
+
+## Problem 1
+
+a. The data collected is used to study individual behaviors patterns on-screen use activities on mobile devices. The data will also test a hypothesis about mobile device usage behaviors. We will determine if there are behavior changes when a group-level competing strategy to reduce screen use activities is introduced. I hypothesize that the group-level competing strategy and monitoring screen usage will not result in a significant reduction in screen use. I predict that even though my classmates and I will be willing to monitor our smartphone usage, we won't necessarily want to control our activities due to our student lifestyle. In both a longitudinal field study and an online experiment, Zimmermann (2021) found that digital self-awareness was less likely to lead to a reduction in mobile usage. 
+
+b. The role of the Informed Consent form is to inform participants of the purpose and characteristics of the study. The participant must understand the study they are volunteering for and potential risks. The informed consent also includes information on the data that the participants should have collected. 
+
+c. The mobile device usage data is collected starting during the winter semester starting January 4th. Screen activity is recorded in real-time by the mobile device. The study started from Variables include the date, total screen time (HH-MM and MM formats), screen time on social media apps (HH-MM and MM formats),the number of pick-ups, and time of the first pick up for each day. Pick ups are defined as the total number of times the user picked up the phone. The first pick up time is defined the first time a use picks up their phone after waking up. The variables are all numeric variables. The screen time data comes from screen time in the settings of mobile devices. Data is collected promptly since the phones only store a limited amount. Participants are also to document major activities that may alter the typical use of mobile devices: if any. I collected 13 data points for the 13 days I was enrolled in the class until Sunday, January 23, 2022. I used backup data for the seven days before my enrollment for a total of 20 observations.  
+
+d. Recording the first pick-up includes some logistic issues because it records the first time after 12:01 am for each day. Thus, the first pick-up can be from staying up late instead of the first time after waking up in the morning. To get a more accurate time of the first pick-up, we changed our time/date settings to the Pacific time zone and added three hours to that time. The time adjustment was temporary to get an accurate first pick up time without manually correcting for bedtimes.Screen activity capture was not collected from class enrollment due to phone settings, so backup data was used for an additional seven days. Key data quality issues include data entry errors. I double-checked each observation to mitigate data quality issues after the initial entry and had another individual read off the numbers. Before each assignment, I will double-check each variable one by one for all new observations to ensure that the correct data matched each date. The initial total screen time and social media screen time are in HH-MM format on the screen activity. To get the time spent in minutes, I used a calculator. Mistakes in calculation can also introduce data entry errors. As part of a good study design, we can double-check the two pairs of variables (Total.ST and Total.ST.min; Social.ST and Social.ST.min) in R by recreating the MM variables by applying functions to the HH-MM variables. Having double entries helps with reducing data entry errors. 
+
+## Problem 2
+
+a. **Time Series Plot for Total Screen Time, Social Screen Time, and Pick-ups**
+```{r}
+data.freeze$weekday = weekdays(data.freeze$Date , abbreviate = T)
+data.freeze = data.freeze %>% mutate (if_weekend = weekday %in% c("Sun","Sat"))
+
+# Total Screen Time
+ggplot(data.freeze, aes(x = Date, y = Total.ST.min, color = if_weekend)) + geom_line(color = "skyblue") + geom_point() + xlab("Date") + ylab("Total Screen Time") + ylim(100,700) + scale_color_manual(labels = c("weekdays", "weekends"), values = c("black", "red")) + theme_minimal() + theme(axis.text.x = element_text(angle = 60, hjust = 1), legend.title = element_blank())
+
+# Social Screen Time
+ggplot(data.freeze, aes(x = Date, y = Social.ST.min, color = if_weekend)) + geom_line(color = "orchid") + geom_point() + xlab("Date") + ylab("Social Screen Time") + ylim(50,300) + scale_color_manual(labels = c("weekdays", "weekends"), values = c("black", "red")) + theme_minimal() + theme(axis.text.x = element_text(angle = 60, hjust = 1), legend.title = element_blank())
+
+# Pick-ups
+ggplot(data.freeze, aes(x = Date, y = Pickups, color = if_weekend)) + geom_line(color = "coral") + geom_point() + xlab("Date") + ylab("Pickups") + ylim(100,250) + scale_color_manual(labels = c("weekdays", "weekends"), values = c("black", "red")) + theme_minimal() + theme(axis.text.x = element_text(angle = 60, hjust = 1), legend.title = element_blank())
+
+```
+<br>
+When looking at total screen time, there are peaks during the middle of the workweek (Tuesday, Wednesday, or Thursdays). There is consistently less screen time on Mondays and Fridays than the other weekdays. Total screen time on weekdays increased after the first week of classes. Screen time on social media apps has slowly decreased every week since the start of the semester when looking at weekdays. The number of pick-ups has less clear patterns compared to the screen time. The number of pick-ups on Sunday tends to be less than Saturdays. 
+
+b. **Pairwise scatter plots for Total Screen Time, Social Screen Time, and Pick-ups**
+```{r}
+ggpairs(data.freeze, columns = c("Total.ST.min", "Social.ST.min", "Pickups"))
+```
+<br>
+There is a weak positive correlation between total screen time and social screen time, with the Pearson correlation of 0.338. There is also a weak positive correlation between total screen time and the number of pick-ups, with the Pearson correlation of 0.215. Interestingly, there is a weak negative correlation between social screen time and the number of pick-ups with a Pearson correlation of -0.246. 
+
+c. **New variable "daily duration per use**
+
+```{r}
+data.freeze <- data.freeze %>% mutate(duration.per.use = Total.ST.min/Pickups)
+head(data.freeze)
+```
+<br>
+The new variable duration.per.use is defined as the ratio of daily total screen time over daily total number of pickups.
+
+d. **Time Series Plot of Daily Duration per Use**
+```{r}
+ggplot(data.freeze, aes(x = Date, y = duration.per.use, color = if_weekend)) + geom_line(color = "forestgreen") + geom_point() + xlab("") + ylab("Ratio of Total Screen Time Over Number of Pick-ups") + theme_minimal() + theme(axis.text.x = element_text(angle = 60, hjust = 1)) + scale_color_manual(labels = c("weekdays", "weekends"), values = c("black", "red"))
+```
+<br>
+The time series plot of the ratio of total screen time over the number of pick-ups fluctuates around 2.5, indicating that I spent on average around 2.5 minutes on my mobile device every time I look at my cellphone.
+
+**Scatter plot of Daily Duration per Use and Daily Total Social Screen Time**
+```{r}
+ggplot(data.freeze, aes(x = duration.per.use, y = Social.ST.min)) + geom_point() + xlab("Duration per Use") + ylab("Social Screen Time") + theme_minimal()
+```
+<br>
+There is a weak positive association between total screen time and the total screen time duration per pick-up. The scatter plot demonstrates a stronger association than social screen time versus the number of pick-ups and social screen time versus total screen time.
+
+e. A potential caveat on the use of "daily duration per use" in the study of mobile device use behavior is the issue of addiction. The ratio will not allow us to see the entire picture of extreme usage with mobile devices. There can be a lot of pick-ups, so the ratio is lower even if the total screen time is excessive. The average time of each pick-up can also vary greatly depending on the way users interact with their phones. In my case, I tend to check my phone frequently for a short amount of time. While others might check their phone less frequently but they do so for a longer period. We can't say for certainty which individual has more screen time. 
+
+## Problem 3
+
+a. **Transform Time of First Pick-up to An Angle**
+```{r}
+data.freeze <- data.freeze %>% mutate(Pickup.1st.angular = (hour(Pickup.1st)*60 + minute(Pickup.1st))/(24*60)*360)
+
+head(data.freeze)
+```
+
+b.
+```{r}
+first.pick.up.cir = circular(data.freeze$Pickup.1st.angular, units = "degrees", template = "clock24")
+plot(first.pick.up.cir)
+```
+<br>
+From the circular scatter plot, most of the 1st pick-up times occur between 5:30 and 9:00 am, reflecting my wake-up time. Two pick-up times were observed closer to 3 am, but this is from the backup data provided. I am a morning person with a large variation in wake-up times.
+
+c. 
+```{r}
+plot(first.pick.up.cir, stack = TRUE, bins = 24, col = "maroon")
+```
+<br>
+I set my bin size to be equivalent to one-hour intervals. The bin size was appropriate to see the variations in my first pick-up times and to see patterns. When I looked at 30-minute intervals, the distribution between 5:30 to 9:00 am was relatively uniform. However, when I look at hour intervals, there is a unimodal distribution. My most frequent wake-up time is between 7:00 to 8:00 am.
+
+
+## Problem 4
+
+a. **Maximum likelihood estimates of two model parameters from first pick-ups**
+```{r, warning = F}
+radians = (data.freeze$Pickup.1st.angular)*(pi/180)
+estimates <- mle.vonmises(radians)
+mu <- estimates$mu
+kappa <- estimates$kappa
+estimates
+```
+
+b. **Plot estimated von Mises density of first pickups**
+```{r}
+ff <- function(x) dvonmises(x, mu = 2*pi - mu, kappa)
+curve.circular(ff, col = "orchid", shrink = 1.5, lwd = 2)
+```
+
+
+c. **Probability that your first pick-up is at 8 am or later**
+```{r, warning = F}
+1 - pvonmises(2.0944, mu, kappa)
+```
+<br>
+The probability that my first pickup is at 8 am or later is 0.248.
+
+## Problem 5
+
+a. 
+```{r}
+acf(data.freeze$Social.ST.min)
+```
+<br>
+My daily social screen time follows the random walk process because the plot showed non-significant autocorrelation over the time sequence of lags. As seen above, the vertical bars are confined within the 95% confidence intervals indicated by the blue horizontal dashed lines. The random walk process error terms are independent and identically distributed with finite moments. 
+
+b. 
+```{r}
+acf(data.freeze$Social.ST.min, plot = FALSE)
+```
+<br>
+A lag τ = 1 autocorrelation indicates the correlations between values that are one period apart. The association between the lag is weak since it is 0.079. 
+
+## Citations
+1. Zimmermann, L. (2021). “Your screen-time app is keeping track”: Consumers are happy to monitor but unlikely to reduce smartphone usage. Journal of the Association for Consumer Research, 000–000. https://doi.org/10.1086/714365 
